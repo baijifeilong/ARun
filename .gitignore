@@ -1,0 +1,7 @@
+# Visual Studio 6 build log
+*.plg
+
+# Visual C++ cache files
+*.ncb
+
+Debug/
