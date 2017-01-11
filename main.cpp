@@ -53,8 +53,11 @@ private:
             case WM_CREATE:
                 OnCreate();
                 break;
+            case WM_SIZE:
+                OnSize();
+                break;
             case WM_COMMAND:
-                if (lParam == (int) m_hwndListBox && HIWORD(wParam) == LBN_DBLCLK) {
+                if (lParam == (LPARAM) m_hwndListBox && HIWORD(wParam) == LBN_DBLCLK) {
                     OnExecute();
                 }
                 break;
@@ -66,16 +69,35 @@ private:
     }
 
     void OnCreate() {
+        RECT rectDesktop, rectWindow;
+        GetWindowRect(GetDesktopWindow(), &rectDesktop);
+        GetWindowRect(m_hwnd, &rectWindow);
+
+        int width = rectWindow.right - rectWindow.left;
+        int height = rectWindow.bottom - rectWindow.top;
+
+        MoveWindow(m_hwnd, (rectDesktop.right - width) / 2, (rectDesktop.bottom - height) / 2, width, height, TRUE);
+
+        cout << m_hwnd << endl;
         RECT rect;
         GetClientRect(m_hwnd, &rect);
         m_hwndListBox = CreateWindow(
-                "ListBox", NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | LBS_STANDARD,
+                "ListBox", NULL, WS_CHILD | WS_VISIBLE | LBS_NOTIFY | WS_VSCROLL,
                 0, 0, rect.right, rect.bottom,
                 m_hwnd, NULL, m_hInstance, NULL);
 
         for (string command: m_commands) {
             SendMessage(m_hwndListBox, LB_ADDSTRING, 0, (LPARAM) command.c_str());
         }
+        for (int i = 0; i < 20; ++i) {
+            SendMessage(m_hwndListBox, LB_ADDSTRING, 0, (LPARAM) ("foo" + to_string(i)).c_str());
+        }
+    }
+
+    void OnSize() {
+        RECT rectClient;
+        GetClientRect(m_hwnd, &rectClient);
+        MoveWindow(m_hwndListBox, 0, 0, rectClient.right, rectClient.bottom, TRUE);
     }
 
     void OnExecute() {
