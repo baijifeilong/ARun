@@ -1,80 +1,99 @@
-#include "myuilib.h"
-#include <string>
-#include <list>
+#include <windows.h>
+#include <assert.h>
 #include <iostream>
-#include <sstream>
+#include <list>
 
 using namespace std;
 
-#define IDC_LISTBOX 10000
-
-struct CMainWnd : CWnd {
-
+class CMainWindow {
+private:
+    const char *m_szAppName = "ARun";
+    static CMainWindow *s_pInstance;
+    HINSTANCE m_hInstance;
+    HWND m_hwnd;
     HWND m_hwndListBox;
-    list <string> commands;
+    list <string> m_commands = {"notepad", "calc", "mspaint"};
 
-    LRESULT WndProc(UINT Msg, WPARAM wParam, LPARAM lParam) {
-        switch (Msg) {
+public:
+    CMainWindow() {
+        s_pInstance = this;
+        m_hInstance = GetModuleHandle(NULL);
+
+        WNDCLASS wc;
+        RtlZeroMemory(&wc, sizeof(wc));
+        wc.hbrBackground = (HBRUSH) (COLOR_WINDOW + 1);
+        wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+        wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+        wc.lpfnWndProc = (WNDPROC) WndProcStatic;
+        wc.lpszClassName = "MyWindow";
+        ATOM atom = RegisterClass(&wc);
+        assert(atom);
+
+        HWND hwnd = CreateWindow(
+                (LPCSTR) (int) atom, m_szAppName, WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+                CW_USEDEFAULT, CW_USEDEFAULT, 300, 444,
+                NULL, NULL, m_hInstance, NULL
+        );
+        assert(hwnd);
+    }
+
+private:
+    LRESULT static CALLBACK WndProcStatic(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+        if (s_pInstance->m_hwnd == NULL) {
+            s_pInstance->m_hwnd = hwnd;
+        }
+        return s_pInstance->WndProc(msg, wParam, lParam);
+    }
+
+    LRESULT CALLBACK WndProc(UINT msg, WPARAM wParam, LPARAM lParam) {
+        switch (msg) {
+            case WM_DESTROY:
+                PostQuitMessage(0);
+                break;
             case WM_CREATE:
-                OnCreate(Msg, wParam, lParam);
+                OnCreate();
                 break;
             case WM_COMMAND:
-                if (LOWORD(wParam) == IDC_LISTBOX && HIWORD(wParam) == LBN_DBLCLK) {
-                    OnExec();
+                if (lParam == (int) m_hwndListBox && HIWORD(wParam) == LBN_DBLCLK) {
+                    OnExecute();
                 }
                 break;
+
             default:
                 break;
         }
-        return CWnd::WndProc(Msg, wParam, lParam);
+        return DefWindowProc(m_hwnd, msg, wParam, lParam);
     }
 
-    void OnCreate(UINT Msg, WPARAM wParam, LPARAM lParam) {
+    void OnCreate() {
         RECT rect;
-        GetWindowRect(m_hwnd, &rect);
-        MoveWindow(m_hwnd, rect.left, rect.top, 300, 500, TRUE);
-
         GetClientRect(m_hwnd, &rect);
         m_hwndListBox = CreateWindow(
-                "LISTBOX", NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | LBS_STANDARD,
-                rect.left, rect.top, rect.right, rect.bottom,
-                m_hwnd, (HMENU) IDC_LISTBOX, GetApp().m_hInstance, NULL);
+                "ListBox", NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | LBS_STANDARD,
+                0, 0, rect.right, rect.bottom,
+                m_hwnd, NULL, m_hInstance, NULL);
 
-        commands.push_back("notepad");
-        commands.push_back("apple");
-        commands.push_back("banana");
-        for (int j = 0; j < 33; ++j) {
-            stringstream ss;
-            ss << "calc" << j;
-            commands.push_back(ss.str());
-        }
-        for (list<string>::iterator i = commands.begin(); i != commands.end(); ++i) {
-            SendMessage(m_hwndListBox, LB_ADDSTRING, 0, (LPARAM) (*i).c_str());
+        for (string command: m_commands) {
+            SendMessage(m_hwndListBox, LB_ADDSTRING, 0, (LPARAM) command.c_str());
         }
     }
 
-    void OnExec() {
+    void OnExecute() {
         char s[100];
-        SendMessage(m_hwndListBox, LB_GETTEXT, (WPARAM) SendMessage(m_hwndListBox, LB_GETCURSEL, 0, 0), (LPARAM) s);
+        int index = SendMessage(m_hwndListBox, LB_GETCURSEL, 0, 0);
+        SendMessage(m_hwndListBox, LB_GETTEXT, (WPARAM) index, (LPARAM) s);
         cout << s << endl;
-        WinExec(s, SW_SHOWDEFAULT);
-    }
-
-    BOOL PreTranslateMessage(MSG &msg) {
-        switch (msg.message) {
-            case WM_CHAR:
-                return FALSE;
-
-            default:
-                break;
-        }
-        return CWnd::PreTranslateMessage(msg);
+        WinExec(s, SW_SHOW);
     }
 };
 
-int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd ) {
-    static CApp app;
-    CMainWnd wnd;
-    wnd.Create();
-    return app.Run();
+CMainWindow *CMainWindow::s_pInstance = nullptr;
+
+int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
+    new CMainWindow;
+    MSG msg;
+    while (GetMessage(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
 }

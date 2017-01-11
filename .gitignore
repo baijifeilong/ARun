@@ -4,4 +4,10 @@
 # Visual C++ cache files
 *.ncb
 
-Debug/
+# User-specific stuff:
+.idea/workspace.xml
+.idea/tasks.xml
+
+# Output folders
+/Debug/
+/cmake-build-debug/
