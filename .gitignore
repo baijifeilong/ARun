@@ -9,5 +9,6 @@
 .idea/tasks.xml
 
 # Output folders
-/Debug/
-/cmake-build-debug/
+Debug/
+cmake-build-debug/
+commands.txt
