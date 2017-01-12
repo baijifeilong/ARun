@@ -11,4 +11,7 @@
 # Output folders
 Debug/
 cmake-build-debug/
+
+# Other files
 commands.txt
+foo.py

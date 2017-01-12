@@ -1,3 +1,4 @@
+import os
 from win32gui import *
 from win32api import *
 from win32con import *
@@ -8,6 +9,7 @@ class MyWindow:
         self.hinst = GetModuleHandle(None)
         self.hwnd_list_box = None
         self.hwnd_edit = None
+        self.file_name = 'commands.txt'
         self.commands = []
 
         InitCommonControls()
@@ -39,7 +41,9 @@ class MyWindow:
         if message == WM_DESTROY:
             PostQuitMessage(0)
         elif message == WM_CREATE:
+            self.init_data()
             self.init_layout()
+            DragAcceptFiles(hwnd, True)
         elif message == WM_SIZE:
             self.update_layout()
         elif message == WM_COMMAND:
@@ -57,7 +61,16 @@ class MyWindow:
                 self.exec_selected_command()
             elif wparam == VK_ESCAPE:
                 PostQuitMessage(0)
+        elif message == WM_DROPFILES:
+            print DragQueryFile(wparam, 0)
         return DefWindowProc(hwnd, message, wparam, lparam)
+
+    def init_data(self):
+        if not os.path.exists(self.file_name):
+            open(self.file_name, 'w').write('calc\nnotepad\nwrite')
+        for line in open(self.file_name):
+            self.commands.append(line.strip())
+        self.commands.sort()
 
     def update_layout(self):
         rect = GetClientRect(self.hwnd)
@@ -89,10 +102,6 @@ class MyWindow:
 
     def update_list_box(self):
         SetFocus(self.hwnd_edit)
-        self.commands = ['calc', 'notepad', 'mspaint']
-        for i in xrange(1, 20):
-            self.commands.append('foo' + str(i))
-
         SendMessage(self.hwnd_list_box, LB_RESETCONTENT)
         for command in self.commands:
             if self.match(GetWindowText(self.hwnd_edit), command):
@@ -113,7 +122,6 @@ class MyWindow:
             else:
                 return False
         return True
-
 
 
 wnd = MyWindow()
