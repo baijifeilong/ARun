@@ -10,7 +10,7 @@ class MyWindow:
         self.hwnd_list_box = None
         self.hwnd_edit = None
         self.file_name = 'commands.txt'
-        self.commands = []
+        self.commands = {}
 
         InitCommonControls()
         wc = WNDCLASS()
@@ -69,8 +69,13 @@ class MyWindow:
         if not os.path.exists(self.file_name):
             open(self.file_name, 'w').write('calc\nnotepad\nwrite')
         for line in open(self.file_name):
-            self.commands.append(line.strip())
-        self.commands.sort()
+            entry = line.strip().split(None, 1)
+            if len(entry) == 2:
+                self.commands[entry[1]] = entry[0]
+            elif len(entry) == 1:
+                self.commands[entry[0]] = entry[0]
+
+        print self.commands
 
     def update_layout(self):
         rect = GetClientRect(self.hwnd)
@@ -103,15 +108,21 @@ class MyWindow:
     def update_list_box(self):
         SetFocus(self.hwnd_edit)
         SendMessage(self.hwnd_list_box, LB_RESETCONTENT)
-        for command in self.commands:
-            if self.match(GetWindowText(self.hwnd_edit), command):
-                SendMessage(self.hwnd_list_box, LB_ADDSTRING, 0, command)
+
+        commands = self.commands.items()
+        commands.sort()
+        count = 0
+        for path, name in sorted(self.commands.items(), key=lambda item: item[1]):
+            if self.match(GetWindowText(self.hwnd_edit), name):
+                SendMessage(self.hwnd_list_box, LB_ADDSTRING, 0, name)
+                SendMessage(self.hwnd_list_box, LB_SETITEMDATA, count, sorted(self.commands.keys()).index(path))
+                count += 1
         SendMessage(self.hwnd_list_box, LB_SETCURSEL)
 
     def exec_selected_command(self):
-        b = PyMakeBuffer(100)
-        SendMessage(self.hwnd_list_box, LB_GETTEXT, SendMessage(self.hwnd_list_box, LB_GETCURSEL), b)
-        command = str(b).split('\x00')[0]
+        index = SendMessage(self.hwnd_list_box, LB_GETITEMDATA, SendMessage(self.hwnd_list_box, LB_GETCURSEL))
+        command = sorted(self.commands.keys())[index]
+        print command
         WinExec(command)
 
     @staticmethod
