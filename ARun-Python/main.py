@@ -51,7 +51,7 @@ class MyWindow:
             self.init_data()
             self.init_layout()
             SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE)
-            RegisterHotKey(hwnd, 22222, MOD_CONTROL, 0x52)
+            RegisterHotKey(hwnd, 22222, MOD_ALT, 0x52)
         elif message == WM_SIZE:
             self.update_layout()
         elif message == WM_COMMAND:
@@ -77,7 +77,7 @@ class MyWindow:
             if wparam == VK_RETURN:
                 self.exec_selected_command()
             elif wparam == VK_ESCAPE:
-                ShowWindow(self.hwnd, SW_HIDE)
+                self.toggle()
 
         return DefWindowProc(hwnd, message, wparam, lparam)
 
@@ -158,12 +158,15 @@ class MyWindow:
         print command
         try:
             WinExec(command)
+            self.toggle()
         except pywintypes.error, e:
             print 'exception'
             MessageBox(self.hwnd, e.strerror.decode('gbk'))
 
     @staticmethod
     def match(x, string):
+        x = x.lower()
+        string = string.lower()
         for char in x:
             if char in string:
                 string = string[string.index(char) + 1:]
@@ -203,9 +206,12 @@ class MyWindow:
 
     def toggle(self):
         if IsWindowVisible(self.hwnd):
+            SetWindowText(self.hwnd_command, "")
             ShowWindow(self.hwnd, SW_HIDE)
         else:
             ShowWindow(self.hwnd, SW_SHOW)
+            SetForegroundWindow(self.hwnd)
+            SetFocus(self.hwnd_command)
 
 
 class MyDialog:
