@@ -4,6 +4,15 @@ from win32api import *
 from win32con import *
 
 
+class Command:
+    def __init__(self, name, path):
+        self.name = name
+        self.path = path
+
+    def __str__(self):
+        return self.name + ':' + self.path
+
+
 class MyWindow:
     def __init__(self):
         self.hinst = GetModuleHandle(None)
@@ -13,7 +22,7 @@ class MyWindow:
         self.hwnd_delete = None
         self.hwnd_edit = None
         self.file_name = 'commands.txt'
-        self.commands = {}
+        self.commands = []
 
         InitCommonControls()
         wc = WNDCLASS()
@@ -38,7 +47,6 @@ class MyWindow:
         elif message == WM_CREATE:
             self.init_data()
             self.init_layout()
-            DragAcceptFiles(hwnd, True)
         elif message == WM_SIZE:
             self.update_layout()
         elif message == WM_COMMAND:
@@ -51,29 +59,29 @@ class MyWindow:
                     print "Change"
                     self.update_list_box()
             elif lparam == self.hwnd_add:
-                MyDialog(self.hwnd)
+                self.do_add()
             elif lparam == self.hwnd_edit:
-                MyDialog(self.hwnd)
+                self.do_edit()
+            elif lparam == self.hwnd_delete:
+                self.do_delete()
         elif message == WM_CHAR:
             print 'char'
             if wparam == VK_RETURN:
                 self.exec_selected_command()
             elif wparam == VK_ESCAPE:
-                # PostQuitMessage(0)
-                MyDialog(self.hwnd)
-        elif message == WM_DROPFILES:
-            print DragQueryFile(wparam, 0)
+                PostQuitMessage(0)
+
         return DefWindowProc(hwnd, message, wparam, lparam)
 
     def init_data(self):
         if not os.path.exists(self.file_name):
             open(self.file_name, 'w').write('calc\nnotepad\nwrite')
         for line in open(self.file_name):
-            entry = line.strip().split(None, 1)
-            if len(entry) == 2:
-                self.commands[entry[1]] = entry[0]
-            elif len(entry) == 1:
-                self.commands[entry[0]] = entry[0]
+            arr = line.strip().split(None, 1)
+            if len(arr) == 1:
+                self.commands.append(Command(arr[0], arr[0]))
+            elif len(arr) == 2:
+                self.commands.append(Command(arr[0], arr[1]))
 
         print self.commands
 
@@ -128,19 +136,17 @@ class MyWindow:
         SetFocus(self.hwnd_command)
         SendMessage(self.hwnd_list_box, LB_RESETCONTENT)
 
-        commands = self.commands.items()
-        commands.sort()
-        count = 0
-        for path, name in sorted(self.commands.items(), key=lambda item: item[1]):
-            if self.match(GetWindowText(self.hwnd_command), name):
-                SendMessage(self.hwnd_list_box, LB_ADDSTRING, 0, name)
-                SendMessage(self.hwnd_list_box, LB_SETITEMDATA, count, sorted(self.commands.keys()).index(path))
-                count += 1
+        self.commands.sort(key=lambda command: command.name.lower())
+        for idx, command in enumerate(self.commands):
+            if self.match(GetWindowText(self.hwnd_command), command.name):
+                SendMessage(self.hwnd_list_box, LB_ADDSTRING, 0, command.name)
+                count = SendMessage(self.hwnd_list_box, LB_GETCOUNT)
+                SendMessage(self.hwnd_list_box, LB_SETITEMDATA, count - 1, idx)
         SendMessage(self.hwnd_list_box, LB_SETCURSEL)
 
     def exec_selected_command(self):
         index = SendMessage(self.hwnd_list_box, LB_GETITEMDATA, SendMessage(self.hwnd_list_box, LB_GETCURSEL))
-        command = sorted(self.commands.keys())[index]
+        command = self.commands[index].path
         print command
         WinExec(command)
 
@@ -153,26 +159,89 @@ class MyWindow:
                 return False
         return True
 
+    def do_add(self):
+        dialog = MyDialog(self.hwnd)
+        if dialog.do_modal() == IDOK:
+            self.commands.append(dialog.command)
+            self.save()
+            self.update_list_box()
+
+    def do_edit(self):
+        curr = SendMessage(self.hwnd_list_box, LB_GETCURSEL)
+        index = SendMessage(self.hwnd_list_box, LB_GETITEMDATA, curr)
+        dialog = MyDialog(self.hwnd)
+        dialog.command = self.commands[index]
+        if dialog.do_modal(True) == IDOK:
+            self.commands[index] = dialog.command
+            self.save()
+            self.update_list_box()
+
+    def do_delete(self):
+        if MessageBox(self.hwnd, 'Are you sure to delete it?', 'Warning', MB_OKCANCEL | MB_ICONEXCLAMATION) == IDOK:
+            curr = SendMessage(self.hwnd_list_box, LB_GETCURSEL)
+            index = SendMessage(self.hwnd_list_box, LB_GETITEMDATA, curr)
+            self.commands.pop(index)
+            self.save()
+            self.update_list_box()
+
+    def save(self):
+        with open(self.file_name, 'w') as f:
+            for command in self.commands:
+                f.write(command.name + '\t' + command.path + '\n')
+
 
 class MyDialog:
     def __init__(self, hwnd):
+        self.hwnd_parent = hwnd
+        self.command = None
+
+    def do_modal(self, edit=False):
         dt = [('Add new command', (0, 0, 120, 60), WS_OVERLAPPEDWINDOW),
               ['STATIC', 'Name:', -1, (5, 5, 45, 9), WS_CHILD | WS_VISIBLE],
               ['EDIT', None, 1, (50, 5, 65, 9), WS_CHILD | WS_VISIBLE],
               ['STATIC', 'Path:', -1, (5, 25, 50, 9), WS_CHILD | WS_VISIBLE],
-              ['EDIT', None, 1, (50, 25, 65, 9), WS_CHILD | WS_VISIBLE],
+              ['EDIT', None, 2, (50, 25, 65, 9), WS_CHILD | WS_VISIBLE],
               ['BUTTON', 'OK', 0, (45, 44, 30, 10), WS_CHILD | WS_VISIBLE]]
-        DialogBoxIndirect(None, dt, hwnd, self.DlgProc)
+        return DialogBoxIndirectParam(None, dt, self.hwnd_parent, self.dlg_proc, edit)
 
-    def DlgProc(self, hwnd, msg, wparam, lparam):
-        if (msg == WM_INITDIALOG):
+    def dlg_proc(self, hwnd, msg, wparam, lparam):
+        if msg == WM_INITDIALOG:
             print 'init'
             DragAcceptFiles(hwnd, True)
-        elif (msg == WM_CLOSE):
-            EndDialog(hwnd, 0)
+            if lparam:
+                SetDlgItemText(hwnd, 1, self.command.name)
+                SetDlgItemText(hwnd, 2, self.command.path)
+        elif msg == WM_CLOSE:
+            EndDialog(hwnd, IDCANCEL)
+        elif msg == WM_COMMAND:
+            if HIWORD(wparam) == BN_CLICKED:
+                name = GetDlgItemText(hwnd, 1)
+                path = GetDlgItemText(hwnd, 2)
+                if not (bool(name) and bool(path)):
+                    MessageBox(hwnd, 'Please input name and path')
+                elif self.command is not None and name == self.command.name and path == self.command.path:
+                    EndDialog(hwnd, IDCANCEL)
+                else:
+                    self.command = Command(name, path)
+                    EndDialog(hwnd, IDOK)
+
+            print 'click'
         elif msg == WM_DROPFILES:
             path = DragQueryFile(wparam, 0)
-            SetDlgItemText(hwnd, 1, path)
+            name = MyDialog.path_to_name(path)
+            if os.path.isdir(path):
+                path = 'explorer ' + path
+            SetDlgItemText(hwnd, 1, name)
+            SetDlgItemText(hwnd, 2, path)
+
+    @staticmethod
+    def path_to_name(s):
+
+        if os.path.isdir(s):
+            ret = s[s.rfind('\\') + 1:]
+        else:
+            ret = s[s.rfind('\\') + 1:s.rfind('.')]
+        return ret
 
 
 wnd = MyWindow()
