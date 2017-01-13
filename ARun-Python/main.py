@@ -1,4 +1,7 @@
+# coding=utf-8
+
 import os
+import pywintypes
 from win32gui import *
 from win32api import *
 from win32con import *
@@ -47,6 +50,8 @@ class MyWindow:
         elif message == WM_CREATE:
             self.init_data()
             self.init_layout()
+            SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE)
+            RegisterHotKey(hwnd, 22222, MOD_CONTROL, 0x52)
         elif message == WM_SIZE:
             self.update_layout()
         elif message == WM_COMMAND:
@@ -64,12 +69,15 @@ class MyWindow:
                 self.do_edit()
             elif lparam == self.hwnd_delete:
                 self.do_delete()
+        elif message == WM_HOTKEY:
+            print 'hotkey'
+            self.toggle()
         elif message == WM_CHAR:
             print 'char'
             if wparam == VK_RETURN:
                 self.exec_selected_command()
             elif wparam == VK_ESCAPE:
-                PostQuitMessage(0)
+                ShowWindow(self.hwnd, SW_HIDE)
 
         return DefWindowProc(hwnd, message, wparam, lparam)
 
@@ -148,7 +156,11 @@ class MyWindow:
         index = SendMessage(self.hwnd_list_box, LB_GETITEMDATA, SendMessage(self.hwnd_list_box, LB_GETCURSEL))
         command = self.commands[index].path
         print command
-        WinExec(command)
+        try:
+            WinExec(command)
+        except pywintypes.error, e:
+            print 'exception'
+            MessageBox(self.hwnd, e.strerror.decode('gbk'))
 
     @staticmethod
     def match(x, string):
@@ -188,6 +200,12 @@ class MyWindow:
         with open(self.file_name, 'w') as f:
             for command in self.commands:
                 f.write(command.name + '\t' + command.path + '\n')
+
+    def toggle(self):
+        if IsWindowVisible(self.hwnd):
+            ShowWindow(self.hwnd, SW_HIDE)
+        else:
+            ShowWindow(self.hwnd, SW_SHOW)
 
 
 class MyDialog:
