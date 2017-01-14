@@ -18,31 +18,33 @@ class Command:
 
 class MyWindow:
     def __init__(self):
+        self.app_name = 'ARun'
         self.hinst = GetModuleHandle(None)
         self.hwnd_list_box = None
         self.hwnd_command = None
+        self.hwnd_desc = None
         self.hwnd_add = None
         self.hwnd_delete = None
         self.hwnd_edit = None
-        self.file_name = 'commands.txt'
+        self.file_name = os.path.dirname(os.path.realpath(__file__)) + '/' + 'commands.txt'
         self.commands = []
 
         InitCommonControls()
         wc = WNDCLASS()
-        wc.lpszClassName = 'MyWndClass'
+        wc.lpszClassName = self.app_name
         wc.style = CS_HREDRAW | CS_VREDRAW
         wc.hbrBackground = COLOR_WINDOW + 1
         wc.lpfnWndProc = self.wnd_proc
 
         self.hwnd = CreateWindow(
-            RegisterClass(wc), "Hello", WS_OVERLAPPEDWINDOW,
-            CW_USEDEFAULT, CW_USEDEFAULT, 200, 300,
+            RegisterClass(wc), self.app_name, WS_OVERLAPPEDWINDOW,
+            CW_USEDEFAULT, CW_USEDEFAULT, 333, 555,
             0, 0, self.hinst, None
         )
 
         SendMessage(self.hwnd, WM_CREATE, 0, 0)
-        UpdateWindow(self.hwnd)
         ShowWindow(self.hwnd, SW_SHOWNORMAL)
+        UpdateWindow(self.hwnd)
 
     def wnd_proc(self, hwnd, message, wparam, lparam):
         if message == WM_DESTROY:
@@ -59,6 +61,8 @@ class MyWindow:
                 if HIWORD(wparam) == LBN_DBLCLK:
                     print "Clicked"
                     self.exec_selected_command()
+                elif HIWORD(wparam) == LBN_SELCHANGE:
+                    self.update_desc()
             elif lparam == self.hwnd_command:
                 if HIWORD(wparam) == EN_CHANGE:
                     print "Change"
@@ -78,27 +82,29 @@ class MyWindow:
                 self.exec_selected_command()
             elif wparam == VK_ESCAPE:
                 self.toggle()
-
         return DefWindowProc(hwnd, message, wparam, lparam)
 
     def init_data(self):
         if not os.path.exists(self.file_name):
-            open(self.file_name, 'w').write('calc\nnotepad\nwrite')
-        for line in open(self.file_name):
-            arr = line.strip().split(None, 1)
-            if len(arr) == 1:
-                self.commands.append(Command(arr[0], arr[0]))
-            elif len(arr) == 2:
-                self.commands.append(Command(arr[0], arr[1]))
-
-        print self.commands
+            MessageBox(None, "Not Exist")
+            with open(self.file_name, 'w') as f:
+                f.write('calc\nnotepad\nwrite')
+        with open(self.file_name) as f:
+            for line in f:
+                arr = line.strip().split(None, 1)
+                if len(arr) == 1:
+                    self.commands.append(Command(arr[0], arr[0]))
+                elif len(arr) == 2:
+                    self.commands.append(Command(arr[0], arr[1]))
 
     def update_layout(self):
         rect = GetClientRect(self.hwnd)
         edit_height = 20
+        desc_height = 20
         button_size = 20
         MoveWindow(self.hwnd_command, 0, 0, rect[2] - button_size * 3, edit_height, True)
-        MoveWindow(self.hwnd_list_box, 0, edit_height, rect[2], rect[3] - edit_height, True)
+        MoveWindow(self.hwnd_list_box, 0, edit_height, rect[2], rect[3] - edit_height - desc_height, True)
+        MoveWindow(self.hwnd_desc, 0, rect[3] - desc_height, rect[2], desc_height, True)
         MoveWindow(self.hwnd_add, rect[2] - button_size * 3, 0, edit_height, edit_height, True)
         MoveWindow(self.hwnd_delete, rect[2] - button_size * 2, 0, edit_height, edit_height, True)
         MoveWindow(self.hwnd_edit, rect[2] - button_size * 1, 0, edit_height, edit_height, True)
@@ -118,6 +124,10 @@ class MyWindow:
         )
         self.hwnd_list_box = CreateWindow(
             'LISTBOX', None, WS_CHILD | WS_VISIBLE | WS_VSCROLL | LBS_NOTIFY,
+            0, 0, 0, 0,
+            self.hwnd, 0, self.hinst, None)
+        self.hwnd_desc = CreateWindow(
+            'STATIC', 'Ready.', WS_CHILD | WS_VISIBLE | WS_BORDER,
             0, 0, 0, 0,
             self.hwnd, 0, self.hinst, None)
         self.hwnd_add = CreateWindow(
@@ -144,13 +154,27 @@ class MyWindow:
         SetFocus(self.hwnd_command)
         SendMessage(self.hwnd_list_box, LB_RESETCONTENT)
 
-        self.commands.sort(key=lambda command: command.name.lower())
+        input_str = GetWindowText(self.hwnd_command)
+
+        self.commands.sort(key=lambda x: x.name.lower())
+        self.commands.sort(lambda x, y: self.match(input_str, y.name) - self.match(input_str, x.name))
+
         for idx, command in enumerate(self.commands):
-            if self.match(GetWindowText(self.hwnd_command), command.name):
+            if self.match(GetWindowText(self.hwnd_command), command.name) > 0:
+                print command.name, ':', self.match(input_str, command.name)
                 SendMessage(self.hwnd_list_box, LB_ADDSTRING, 0, command.name)
                 count = SendMessage(self.hwnd_list_box, LB_GETCOUNT)
                 SendMessage(self.hwnd_list_box, LB_SETITEMDATA, count - 1, idx)
         SendMessage(self.hwnd_list_box, LB_SETCURSEL)
+        self.update_desc()
+
+    def update_desc(self):
+        if SendMessage(self.hwnd_list_box, LB_GETCOUNT) > 0:
+            sel = SendMessage(self.hwnd_list_box, LB_GETCURSEL)
+            index = SendMessage(self.hwnd_list_box, LB_GETITEMDATA, sel)
+            SetWindowText(self.hwnd_desc, self.commands[index].path)
+        else:
+            SetWindowText(self.hwnd_desc, 'Ready.')
 
     def exec_selected_command(self):
         index = SendMessage(self.hwnd_list_box, LB_GETITEMDATA, SendMessage(self.hwnd_list_box, LB_GETCURSEL))
@@ -164,15 +188,32 @@ class MyWindow:
             MessageBox(self.hwnd, e.strerror.decode('gbk'))
 
     @staticmethod
-    def match(x, string):
-        x = x.lower()
-        string = string.lower()
-        for char in x:
-            if char in string:
-                string = string[string.index(char) + 1:]
+    def match(src='', dst=''):
+        if src.strip() == '':
+            return 1
+        elif dst.strip() == '':
+            return 0
+        src = src.lower()
+        dst_old = dst
+        dst = dst[0].upper() + dst[1:]
+        ret = 0
+        if src == dst.lower():
+            ret += 10000  # Total match
+        if src[0] == dst[0].lower():
+            ret += 1000  # First letter match
+        for i, char in enumerate(src):
+            if char.upper() in dst:
+                dst = dst[dst.index(char.upper()) + 1:]
+                ret += 100  # A upper letter match
+            elif char in dst:
+                dst = dst[dst.index(char) + 1:]
+                ret += 1  # A lower letter match
+                if i > 0 and src[i - 1:i + 1] in dst_old.lower():
+                    ret += 10  # A continuous match
             else:
-                return False
-        return True
+                ret = 0  # Not match
+                break
+        return ret
 
     def do_add(self):
         dialog = MyDialog(self.hwnd)
