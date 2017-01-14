@@ -17,6 +17,8 @@ class Command:
 
 
 class MyWindow:
+    WMU_TRAY = WM_USER + 20
+
     def __init__(self):
         self.app_name = 'ARun'
         self.hinst = GetModuleHandle(None)
@@ -26,6 +28,7 @@ class MyWindow:
         self.hwnd_add = None
         self.hwnd_delete = None
         self.hwnd_edit = None
+        self.hmenu = None
         self.file_name = os.path.dirname(os.path.realpath(__file__)) + '/' + 'commands.txt'
         self.commands = []
 
@@ -50,13 +53,11 @@ class MyWindow:
         if message == WM_DESTROY:
             PostQuitMessage(0)
         elif message == WM_CREATE:
-            self.init_data()
-            self.init_layout()
-            SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE)
-            RegisterHotKey(hwnd, 22222, MOD_ALT, 0x52)
+            self.on_create()
         elif message == WM_SIZE:
             self.update_layout()
         elif message == WM_COMMAND:
+            print 'command'
             if lparam == self.hwnd_list_box:
                 if HIWORD(wparam) == LBN_DBLCLK:
                     print "Clicked"
@@ -73,6 +74,12 @@ class MyWindow:
                 self.do_edit()
             elif lparam == self.hwnd_delete:
                 self.do_delete()
+            elif lparam == 0:
+                if wparam == 1:
+                    self.toggle()
+                elif wparam == 2:
+                    PostQuitMessage(0)
+
         elif message == WM_HOTKEY:
             print 'hotkey'
             self.toggle()
@@ -82,7 +89,42 @@ class MyWindow:
                 self.exec_selected_command()
             elif wparam == VK_ESCAPE:
                 self.toggle()
+        elif message == self.WMU_TRAY:
+            if lparam == WM_LBUTTONUP:
+                self.toggle()
+            elif lparam == WM_RBUTTONDOWN:
+                point = GetCursorPos()
+                SetForegroundWindow(self.hwnd)
+                if IsWindowVisible(self.hwnd):
+                    txt = 'Hide'
+                else:
+                    txt = 'Show'
+                ModifyMenu(self.hmenu, 1, MF_BYCOMMAND, 1, txt)
+                TrackPopupMenu(self.hmenu, TPM_RIGHTBUTTON, point[0], point[1], 0, hwnd, None)
+        elif message == WM_SYSCOMMAND:
+            print 'syscommand'
+            if wparam == SC_MINIMIZE:
+                self.toggle()
+                return 0
         return DefWindowProc(hwnd, message, wparam, lparam)
+
+    def on_create(self):
+        self.init_data()
+        self.init_layout()
+        SetWindowPos(self.hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE)
+        try:
+            RegisterHotKey(self.hwnd, 22222, MOD_ALT, 0x52)
+        except pywintypes.error, e:
+            MessageBox(self.hwnd, e.strerror)
+
+        Shell_NotifyIcon(NIM_ADD, (
+            self.hwnd, 0, NIF_ICON | NIF_MESSAGE | NIF_TIP, self.WMU_TRAY,
+            LoadIcon(None, IDI_ERROR), 'You see see'
+        ))
+
+        self.hmenu = CreatePopupMenu()
+        AppendMenu(self.hmenu, MF_STRING, 1, 'Show')
+        AppendMenu(self.hmenu, MF_STRING, 2, 'Exit')
 
     def init_data(self):
         if not os.path.exists(self.file_name):
@@ -161,7 +203,7 @@ class MyWindow:
 
         for idx, command in enumerate(self.commands):
             if self.match(GetWindowText(self.hwnd_command), command.name) > 0:
-                print command.name, ':', self.match(input_str, command.name)
+                # print command.name, ':', self.match(input_str, command.name)
                 SendMessage(self.hwnd_list_box, LB_ADDSTRING, 0, command.name)
                 count = SendMessage(self.hwnd_list_box, LB_GETCOUNT)
                 SendMessage(self.hwnd_list_box, LB_SETITEMDATA, count - 1, idx)
@@ -310,9 +352,14 @@ class MyDialog:
 
 
 wnd = MyWindow()
+haccel = CreateAcceleratorTable([
+    (FCONTROL, 0x52, 3333)
+])
+print haccel
 while True:
     _, msg = GetMessage(None, 0, 0)
     if _:
+        x = TranslateAccelerator(msg[0], haccel, msg)
         if msg[1] == WM_CHAR:
             print "WM_CHAR: ", msg
             msg = list(msg)
@@ -321,7 +368,16 @@ while True:
             else:
                 msg[0] = wnd.hwnd_command
             msg = tuple(msg)
+        elif msg[1] in (WM_KEYUP, WM_KEYDOWN):
+            if msg[2] in (VK_DOWN, VK_UP):
+                print 'fds'
+                print msg
+                print wnd.hwnd_list_box
+                msg = list(msg)
+                msg[0] = wnd.hwnd_list_box
+                msg = tuple(msg)
         TranslateMessage(msg)
         DispatchMessage(msg)
     else:
         break
+DestroyAcceleratorTable(haccel)
