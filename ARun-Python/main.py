@@ -79,6 +79,13 @@ class MyWindow:
                     self.toggle()
                 elif wparam == 2:
                     PostQuitMessage(0)
+                elif LOWORD(wparam) == 1001:
+                    cur = SendMessage(self.hwnd_list_box, LB_GETCURSEL)
+                    if cur > 0:
+                        SendMessage(self.hwnd_list_box, LB_SETCURSEL, cur - 1)
+                elif LOWORD(wparam) == 1002:
+                    cur = SendMessage(self.hwnd_list_box, LB_GETCURSEL)
+                    SendMessage(self.hwnd_list_box, LB_SETCURSEL, cur + 1)
 
         elif message == WM_HOTKEY:
             print 'hotkey'
@@ -113,7 +120,7 @@ class MyWindow:
         self.init_layout()
         SetWindowPos(self.hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE)
         try:
-            RegisterHotKey(self.hwnd, 22222, MOD_ALT, 0x52)
+            RegisterHotKey(self.hwnd, 22222, MOD_ALT, ord('R'))
         except pywintypes.error, e:
             MessageBox(self.hwnd, e.strerror)
 
@@ -353,31 +360,35 @@ class MyDialog:
 
 wnd = MyWindow()
 haccel = CreateAcceleratorTable([
-    (FCONTROL, 0x52, 3333)
+    (FSHIFT | FVIRTKEY, ord('M'), SC_MINIMIZE),
+    (FCONTROL | FVIRTKEY, ord('P'), 1001),
+    (FCONTROL | FVIRTKEY, ord('N'), 1002),
+    (FSHIFT | FVIRTKEY, ord('\t'), 1001),
+    (FVIRTKEY, ord('\t'), 1002),
 ])
 print haccel
 while True:
     _, msg = GetMessage(None, 0, 0)
     if _:
-        x = TranslateAccelerator(msg[0], haccel, msg)
-        if msg[1] == WM_CHAR:
-            print "WM_CHAR: ", msg
-            msg = list(msg)
-            if msg[2] in (VK_RETURN, VK_ESCAPE):
-                msg[0] = wnd.hwnd
-            else:
-                msg[0] = wnd.hwnd_command
-            msg = tuple(msg)
-        elif msg[1] in (WM_KEYUP, WM_KEYDOWN):
-            if msg[2] in (VK_DOWN, VK_UP):
-                print 'fds'
-                print msg
-                print wnd.hwnd_list_box
+        if not TranslateAccelerator(wnd.hwnd, haccel, msg):
+            if msg[1] == WM_CHAR:
+                print "WM_CHAR: ", msg
                 msg = list(msg)
-                msg[0] = wnd.hwnd_list_box
+                if msg[2] in (VK_RETURN, VK_ESCAPE):
+                    msg[0] = wnd.hwnd
+                else:
+                    msg[0] = wnd.hwnd_command
                 msg = tuple(msg)
-        TranslateMessage(msg)
-        DispatchMessage(msg)
+            elif msg[1] in (WM_KEYUP, WM_KEYDOWN):
+                if msg[2] in (VK_DOWN, VK_UP):
+                    print 'fds'
+                    print msg
+                    print wnd.hwnd_list_box
+                    msg = list(msg)
+                    msg[0] = wnd.hwnd_list_box
+                    msg = tuple(msg)
+            TranslateMessage(msg)
+            DispatchMessage(msg)
     else:
         break
 DestroyAcceleratorTable(haccel)

@@ -114,7 +114,16 @@ CMainWindow *CMainWindow::s_pInstance = nullptr;
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     new CMainWindow;
     MSG msg;
+    ACCEL accel[] =
+            {
+                    {FSHIFT | FVIRTKEY, 'N',     SC_MINIMIZE}, // 最小化窗口Shift+ N
+                    {FSHIFT | FVIRTKEY, 'X',     SC_MAXIMIZE}, // 最大化窗口 Shift + X
+                    {FSHIFT | FVIRTKEY, 'R',     SC_RESTORE}, // 还原窗口 Shift + R
+                    {FCONTROL | FVIRTKEY, VK_F4, SC_CLOSE}, // 退出 Ctrl + F4
+            };
+    HACCEL a = CreateAcceleratorTable(accel, 4);
     while (GetMessage(&msg, NULL, 0, 0)) {
+        TranslateAccelerator(msg.hwnd, a, &msg);
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
