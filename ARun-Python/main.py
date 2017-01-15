@@ -86,6 +86,12 @@ class MyWindow:
                 elif LOWORD(wparam) == 1002:
                     cur = SendMessage(self.hwnd_list_box, LB_GETCURSEL)
                     SendMessage(self.hwnd_list_box, LB_SETCURSEL, cur + 1)
+                elif LOWORD(wparam) == 1003:
+                    self.do_add()
+                elif LOWORD(wparam) == 1004:
+                    self.do_delete()
+                elif LOWORD(wparam) == 1005:
+                    self.do_edit()
 
         elif message == WM_HOTKEY:
             print 'hotkey'
@@ -111,6 +117,9 @@ class MyWindow:
         elif message == WM_SYSCOMMAND:
             print 'syscommand'
             if wparam == SC_MINIMIZE:
+                self.toggle()
+                return 0
+            elif wparam == SC_CLOSE:
                 self.toggle()
                 return 0
         return DefWindowProc(hwnd, message, wparam, lparam)
@@ -230,7 +239,14 @@ class MyWindow:
         command = self.commands[index].path
         print command
         try:
-            WinExec(command)
+            # WinExec(command)
+            arr = command.split(None, 1)
+            exe = arr[0]
+            param = None
+            if len(arr) > 1:
+                param = arr[1]
+            ShellExecute(self.hwnd, 'open', exe, param, None, SW_SHOW)
+
             self.toggle()
         except pywintypes.error, e:
             print 'exception'
@@ -363,6 +379,9 @@ haccel = CreateAcceleratorTable([
     (FSHIFT | FVIRTKEY, ord('M'), SC_MINIMIZE),
     (FCONTROL | FVIRTKEY, ord('P'), 1001),
     (FCONTROL | FVIRTKEY, ord('N'), 1002),
+    (FCONTROL | FVIRTKEY, ord('A'), 1003),
+    (FCONTROL | FVIRTKEY, ord('D'), 1004),
+    (FCONTROL | FVIRTKEY, ord('E'), 1005),
     (FSHIFT | FVIRTKEY, ord('\t'), 1001),
     (FVIRTKEY, ord('\t'), 1002),
 ])
